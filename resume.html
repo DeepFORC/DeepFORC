@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>给磁铁矿建一张“对称商图”：图论如何把微磁势垒搜索提速几十倍</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --surface-soft: #f1f4f9;
+      --ink: #17202e;
+      --muted: #5a6577;
+      --border: #dfe5ef;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #0f8a5f;
+      --green-soft: #d1fae5;
+      --amber: #c26d00;
+      --amber-soft: #fef3c7;
+      --red: #dc2626;
+      --red-soft: #fee2e2;
+      --purple: #6d28d9;
+      --purple-soft: #ede9fe;
+      --radius: 16px;
+      --shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 36px 20px 72px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%);
+      color: #ffffff;
+      border-radius: 22px;
+      padding: 44px 40px 38px;
+      box-shadow: 0 14px 36px rgba(30, 58, 138, 0.22);
+      margin-bottom: 32px;
+    }
+    .hero-tag {
+      display: inline-block;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      margin: 0 0 14px;
+      font-size: clamp(26px, 4vw, 36px);
+      line-height: 1.25;
+      font-weight: 700;
+    }
+    .hero p {
+      margin: 0;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.88);
+      max-width: 760px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 26px;
+    }
+    .kpi {
+      background: rgba(255, 255, 255, 0.11);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .kpi .num {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+    .kpi .lbl {
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    section.card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 32px 30px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+    .sec-num {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--blue);
+      background: var(--blue-soft);
+      padding: 2px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      line-height: 1.35;
+    }
+    .lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--ink);
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .btn:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+    .btn.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #ffffff;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 20px;
+      align-items: stretch;
+    }
+    .viz-box {
+      background: #fafbfd;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .viz-box svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .class-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .class-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .class-item:hover {
+      border-color: var(--blue);
+      transform: translateY(-1px);
+    }
+    .class-item.active {
+      border-color: var(--blue);
+      background: #eff6ff;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+    }
+    .class-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .class-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .class-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .badge-blue { background: var(--blue-soft); color: var(--blue); }
+    .badge-green { background: var(--green-soft); color: var(--green); }
+    .badge-red { background: var(--red-soft); color: var(--red); }
+
+    .callout {
+      margin-top: 16px;
+      background: var(--surface-soft);
+      border-left: 4px solid var(--blue);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 14px;
+    }
+    .callout.warn {
+      border-left-color: var(--red);
+      background: #fff5f5;
+    }
+    .callout.good {
+      border-left-color: var(--green);
+      background: #f0fdf7;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .mini-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      background: #fafbfd;
+    }
+    .mini-card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .big-stat {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 8px 0 4px;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .step-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: #fafbfd;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .step-card.active {
+      border-color: var(--blue);
+      background: #eff6ff;
+    }
+    .step-card .s-idx {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--blue);
+      margin-bottom: 4px;
+    }
+    .step-card .s-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .step-card .s-desc {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .calc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 20px;
+      align-items: center;
+    }
+    .control-group {
+      margin-bottom: 16px;
+    }
+    .control-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    select, input[type="range"] {
+      width: 100%;
+    }
+    select {
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .bar-wrap {
+      margin: 12px 0;
+    }
+    .bar-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13.5px;
+      margin-bottom: 5px;
+    }
+    .bar-track {
+      height: 14px;
+      background: #e9eef6;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 32px;
+      line-height: 1.8;
+    }
+    footer a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 780px) {
+      .hero { padding: 28px 22px; }
+      section.card { padding: 24px 18px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .split, .two-col, .calc-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <div class="hero-tag">科普导读 · 图论 × 群论 × 微磁学（symbarrier）</div>
+      <h1>把 120 条路径折成 3 条：<br />对称商图如何把微磁势垒搜索提速几十倍？</h1>
+      <p>
+        岩石里百纳米级的磁铁矿颗粒，能把地球几十亿年前的磁场方向“刻”在磁化结构里。要判断一颗颗粒到底能不能记住古磁场，科学家必须算出它在不同磁化态之间翻转需要翻越多高的“能量垭口”。我们的开源方法 <strong>symbarrier</strong> 用图论里的<strong>对称商图（Quotient Graph）</strong>与<strong>瓶颈最短路（Minimax）</strong>，把原本动辄上百次的昂贵路径搜索压缩到只需几条。
+      </p>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="num">120 → 3</div>
+          <div class="lbl">16 态立方涡旋短边图路径数</div>
+        </div>
+        <div class="kpi">
+          <div class="num">最高 96×</div>
+          <div class="lbl">立方点群 + 时间反演理论约化上限</div>
+        </div>
+        <div class="kpi">
+          <div class="num">4.34 秒</div>
+          <div class="lbl">150 nm 颗粒群论记账耗时</div>
+        </div>
+        <div class="kpi">
+          <div class="num">2.4–3.8×</div>
+          <div class="lbl">单带 NEB 在涡旋态下的系统性高估</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="sec-num">01 · 先把物理问题翻译成一张“图”</div>
+      <h2>一颗纳米磁铁矿，本质上是一座“山谷与垭口”组成的网络</h2>
+      <p class="lead">
+        当磁铁矿颗粒长到约 100 纳米以上，内部磁矩不再整齐划一，而是卷成涡旋（vortex）。同一颗颗粒往往有十几个甚至几十个稳定的磁化构型（局部能量极小态，LEM）。在图论眼里，它就是一张<strong>无向加权图 G = (V, E)</strong>：
+      </p>
+      <div class="two-col">
+        <div class="mini-card">
+          <h3>节点 V = 稳定磁化态（山谷）</h3>
+          <p style="margin:0;font-size:14px;color:var(--muted);">
+            每个节点代表一种磁化构型。例如截角八面体中的 ⟨111⟩ 涡旋有 <strong>8 个核方向 × 2 种旋转手性 = 16 个等价山谷</strong>。
+          </p>
+        </div>
+        <div class="mini-card">
+          <h3>边 E = 翻转路径（垭口势垒）</h3>
+          <p style="margin:0;font-size:14px;color:var(--muted);">
+            每条边连接两个山谷，边权就是翻越它们之间最高能量点（鞍点）所需的势垒 ΔE。每算一条边都要跑一次昂贵的微动弹性带（NEB）优化。
+          </p>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>算力爆炸在哪里？</strong> 如果有 <em>n</em> 个山谷，两两相连共有 <em>n(n−1)/2</em> 条边。16 个态就有 <strong>120 条边</strong>；如果同时考虑三个态族（52 个态），全对连接就是 <strong>1326 条边</strong>！在单核上逐条跑 NEB 动辄需要几天甚至几周。
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="sec-num">02 · 图论绝招一：对称商图（Quotient Graph）</div>
+      <h2>把“对称折纸”折起来算：点击右侧边类，看左图哪些边瞬间被同时算完</h2>
+      <p class="lead">
+        对称颗粒里，绝大多数边其实长着一模一样的能量剖面——它们只是经过旋转、反演或时间反演（所有磁矩反向）后的复制品。图论中把“除以对称群 𝒢 = G × {1, T}、将等价节点和等价边合并”得到的新图，叫做<strong>商图（Quotient Graph）</strong>。
+      </p>
+
+      <div class="btn-row" id="modeBtns">
+        <button class="btn active" data-mode="cube8">8 态立方体（28 条边 → 3 类）</button>
+        <button class="btn" data-mode="vortex16">16 态 ⟨111⟩ 涡旋（120 条边 → 7 类 / 短边 3 类）</button>
+      </div>
+
+      <div class="split">
+        <div class="viz-box">
+          <svg id="quotientSvg" viewBox="0 0 460 320" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div id="svgCaption" style="font-size:13px;color:var(--muted);margin-top:8px;text-align:center;"></div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;">
+            点击下方商图中的任意“边类”，高亮它在完整网络中覆盖的全部等价边：
+          </div>
+          <div class="class-list" id="classList"></div>
+          <div class="callout good" id="classExplain" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="sec-num">03 · 图论绝招二：瓶颈最短路（Minimax Dijkstra）</div>
+      <h2>为什么“直走反倒更费劲”？看看 100 nm 颗粒的生死逆转</h2>
+      <p class="lead">
+        很多人估算磁稳定性时，只算一条从初态 <strong>m₀</strong> 直接翻转到反平行态 <strong>−m₀</strong> 的单带 NEB。但在多山谷地形里，热激活并不要求“一步跨过最高峰”，而是可以<strong>像登山者一样绕道几个邻近山谷接力翻转</strong>。在图论里，这叫<strong>极小极大路径（Minimax Path）</strong>：把传统 Dijkstra 算法里的“路径长度求和（+）”换成“沿途最高垭口（max）”。
+      </p>
+
+      <div class="btn-row" id="pathBtns">
+        <button class="btn active" data-path="compare">同时对比两种路径</button>
+        <button class="btn" data-path="single">只看传统单带（直接硬翻）</button>
+        <button class="btn" data-path="minimax">只看商图 Minimax（三步接力）</button>
+      </div>
+
+      <div class="viz-box" style="margin-bottom:16px;">
+        <svg id="minimaxSvg" viewBox="0 0 860 270" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+
+      <div class="two-col">
+        <div class="mini-card" style="border-color:#fca5a5;background:#fff7f7;">
+          <h3>传统单带 NEB（m₀ → −m₀） <span class="badge badge-red">高估 3.77×</span></h3>
+          <div class="big-stat" style="color:var(--red);">178.6 <span style="font-size:15px;font-weight:500;">k<sub>B</sub>T<sub>300</sub></span></div>
+          <p style="margin:0;font-size:13.5px;color:var(--muted);">
+            远高于 10 亿年稳定阈值（58.7），会<strong>误判</strong>这颗 100 nm 磁铁矿是“地质时间尺度的超级稳定记录者”。
+          </p>
+        </div>
+        <div class="mini-card" style="border-color:#86efac;background:#f2fdf6;">
+          <h3>商图 Minimax 接力路径 <span class="badge badge-green">真实上界</span></h3>
+          <div class="big-stat" style="color:var(--green);">47.4 <span style="font-size:15px;font-weight:500;">k<sub>B</sub>T<sub>300</sub></span></div>
+          <p style="margin:0;font-size:13.5px;color:var(--muted);">
+            经由邻角 70.5° 涡旋多步接力，弛豫时间 <strong>τ ≲ 10⁴ 年</strong>——在地质时间尺度上其实<strong>并不稳定</strong>！
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="sec-num">04 · 图论避坑：为什么不能按“距离远近”偷懒分组？</div>
+      <h2>距离相差不到 5°，势垒却差了 7.5 倍</h2>
+      <p class="lead">
+        一个很自然的想法是：“既然两态之间旋转角度一样，势垒不就一样吗？按磁化 rms 距离分组不就行了？”我们在 100 nm 立方八面体上实测了这个直觉，结果踩中了一个大坑：
+      </p>
+
+      <div class="btn-row" id="groupBtns">
+        <button class="btn active" data-grp="orbit">按稳定子群轨道分组（symbarrier）</button>
+        <button class="btn" data-grp="dist">按磁化距离分组（直觉启发式）</button>
+      </div>
+
+      <div class="viz-box">
+        <svg id="distSvg" viewBox="0 0 860 185" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="callout" id="distCallout"></div>
+    </section>
+
+    <section class="card">
+      <div class="sec-num">05 · 没有对称性的天然颗粒怎么办？ + 提速计算器</div>
+      <h2>自适应闭环（Algorithm 2）与不同对称性的实测加速比</h2>
+      <p class="lead">
+        自然界玄武岩里的磁铁矿颗粒歪瓜裂枣（点群阶数 |G| = 1），只剩时间反演（2 倍约化）。这时商图网络通过<strong>自适应闭环</strong>自动发现遗漏的隐藏山谷，并把算过的路径全部放进缓存复用，绝不重复算。
+      </p>
+
+      <div class="steps" id="loopSteps">
+        <div class="step-card active" data-step="0">
+          <div class="s-idx">STEP 1</div>
+          <div class="s-name">商图算第一轮 NEB</div>
+          <div class="s-desc">V116 天然颗粒 3 族 6 态，仅算 7 条代表边（跳过时间反演重复边）。</div>
+        </div>
+        <div class="step-card" data-step="1">
+          <div class="s-idx">STEP 2</div>
+          <div class="s-name">扫描带内“隐藏谷底”</div>
+          <div class="s-desc">自动检查每条 NEB 剖面，把比相邻像低 2 k<sub>B</sub>T 以上的内部极小值重新弛豫。</div>
+        </div>
+        <div class="step-card" data-step="2">
+          <div class="s-idx">STEP 3</div>
+          <div class="s-name">收编新态家族</div>
+          <div class="s-desc">在 V116 中找回 15 次初始搜索漏掉的新态（距已知态 48° rms），扩展为 4 族 8 态。</div>
+        </div>
+        <div class="step-card" data-step="3">
+          <div class="s-idx">STEP 4</div>
+          <div class="s-name">缓存复用，只补新边</div>
+          <div class="s-desc">第 2 轮直接复用已算的 7 条旧边，只补算涉及新族的 6 条边，无新态即收敛闭环。</div>
+        </div>
+      </div>
+
+      <h3 style="margin:26px 0 12px;font-size:17px;">交互式提速计算器：看看不同颗粒能省掉多少次 NEB</h3>
+      <div class="calc-grid">
+        <div>
+          <div class="control-group">
+            <label for="grainSelect">选择颗粒几何与晶轴对称性</label>
+            <select id="grainSelect">
+              <option value="oh_short">截角八面体 · 晶轴对齐（O_h，|𝒢|=96，短边图 K=4）</option>
+              <option value="oh_all">截角八面体 · 晶轴对齐（O_h，|𝒢|=96，全对图）</option>
+              <option value="d4h">方棱柱 120×120×200 nm（D_4h，|𝒢|=32，短边图）</option>
+              <option value="ci">截角八面体 · 旋转晶轴（C_i，|𝒢|=4）</option>
+              <option value="natural">维苏威天然玄武岩颗粒（无点群对称，|𝒢|=2）</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label>单条 NEB 平均耗时 <span id="timeVal">3 分钟</span></label>
+            <input type="range" id="timeSlider" min="1" max="30" value="3" />
+          </div>
+          <div class="callout good" id="calcSummary" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="mini-card">
+          <div class="bar-wrap">
+            <div class="bar-head">
+              <span>传统无约化全对 NEB</span>
+              <strong id="fullLabel">120 条 · 6.0 小时</strong>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" id="fullBar" style="width:100%;background:#94a3b8;"></div>
+            </div>
+          </div>
+
+          <div class="bar-wrap">
+            <div class="bar-head">
+              <span>symbarrier 商图约化</span>
+              <strong id="quotLabel" style="color:var(--blue);">3 条 · 9 分钟</strong>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" id="quotBar" style="width:4%;background:var(--blue);"></div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);font-size:13.5px;">
+            <span>群论记账时间：<strong id="bookTime">4.34 秒</strong></span>
+            <span>实测路径压缩：<strong id="speedupBadge" style="color:var(--green);">40.0×</strong></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      基于论文 <em>Symmetry quotient networks: automatic reduction and verifiable upper bounds for energy barriers in micromagnetic models of magnetic grains</em>（拟投 <em>Computers &amp; Geosciences</em>）整理。<br />
+      开源代码：<a href="https://github.com/earthmagnetism/symbarrier" target="_blank" rel="noopener">github.com/earthmagnetism/symbarrier</a> ·
+      归档版本：<a href="https://doi.org/10.5281/zenodo.24433176" target="_blank" rel="noopener">DOI: 10.5281/zenodo.24433176</a><br />
+      对照文献：<a href="https://www.pnas.org/doi/10.1073/pnas.1708344114" target="_blank" rel="noopener">Nagy et al. (2017)</a> ·
+      <a href="https://academic.oup.com/gji/article/215/1/314/5055144" target="_blank" rel="noopener">Fabian &amp; Shcherbakov (2018)</a> ·
+      <a href="https://core.ac.uk/download/674616687.pdf" target="_blank" rel="noopener">Gergov et al. (2025)</a>
+    </footer>
+  </div>
+
+  <script>
+    const cubeVertices = [
+      { id: 0, x: 115, y: 120, bits: [-1, 1, 1] },
+      { id: 1, x: 255, y: 120, bits: [1, 1, 1] },
+      { id: 2, x: 255, y: 260, bits: [1, -1, 1] },
+      { id: 3, x: 115, y: 260, bits: [-1, -1, 1] },
+      { id: 4, x: 175, y: 65,  bits: [-1, 1, -1] },
+      { id: 5, x: 315, y: 65,  bits: [1, 1, -1] },
+      { id: 6, x: 315, y: 205, bits: [1, -1, -1] },
+      { id: 7, x: 175, y: 205, bits: [-1, -1, -1] }
+    ];
+
+    const cubeAllEdges = [];
+    for (let i = 0; i < 8; i++) {
+      for (let j = i + 1; j < 8; j++) {
+        const dot = cubeVertices[i].bits[0]*cubeVertices[j].bits[0] +
+                    cubeVertices[i].bits[1]*cubeVertices[j].bits[1] +
+                    cubeVertices[i].bits[2]*cubeVertices[j].bits[2];
+        let cls = dot === 1 ? 0 : (dot === -1 ? 1 : 2);
+        cubeAllEdges.push({ a: i, b: j, cls });
+      }
+    }
+
+    const modes = {
+      cube8: {
+        caption: '左：8 态立方体的 28 条边（浅灰线为其余边，高亮为当前边类的全部等价边）',
+        classes: [
+          { id: 0, title: '类 1 · 70.5° 邻边', sub: '沿立方体棱翻转', count: 12, color: '#2563eb', badge: '12 条 → 1 次',
+            explain: '立方体共有 12 条棱。因为 O_h 旋转可以把任意一条棱变到另一条，商图里只保留 1 个代表，算 1 次 NEB 就能给全部 12 条棱赋值！' },
+          { id: 1, title: '类 2 · 109.5° 面对角线', sub: '跨过一个面翻转', count: 12, color: '#0f8a5f', badge: '12 条 → 1 次',
+            explain: '6 个面 × 每面 2 条面对角线 = 12 条边，全部属于同一个群轨道，只需算 1 次 NEB。' },
+          { id: 2, title: '类 3 · 180° 时间反演', sub: '直接 m₀ → −m₀', count: 4, color: '#c26d00', badge: '4 条 → 1 次',
+            explain: '4 条体对角线把每个态直接连到它的时间反演态 −m₀，合为 1 个类。总计 12+12+4 = 28 条边，商图只算 3 条！' }
+        ]
+      },
+      vortex16: {
+        caption: '16 态 ⟨111⟩ 涡旋 = 右手层 (R, 8 态) + 左手层 (L, 8 态)，共 120 条边',
+        classes: [
+          { id: 0, title: '类 1 · 同手性 70.5°（短边图）', sub: 'R→R / L→L 邻角 · 限速跳变', count: 24, color: '#2563eb', badge: '24 条 → 1 次',
+            explain: '150 nm 截角八面体真正的限速通道（645.9 k_BT）！短边图 K=4 自动选中这一类，1 次 NEB 覆盖 24 条等价边。' },
+          { id: 1, title: '类 2 · 同手性 109.5°（短边图）', sub: 'R→R / L→L 面对角', count: 24, color: '#0f8a5f', badge: '24 条 → 1 次',
+            explain: '同手性面对角跃迁，K=4 的第 4 近邻落在此类，1 次 NEB 覆盖 24 条边。' },
+          { id: 2, title: '类 3 · 同手性 180°（短边图）', sub: '直接时间反演 m₀ → −m₀', count: 8, color: '#c26d00', badge: '8 条 → 1 次',
+            explain: '时间反演 T 翻转涡旋核但保持手性不变，Algorithm 1 强制将其纳入短边图。前 3 类合计只需 3 条 NEB！' },
+          { id: 3, title: '类 4–7 · 异手性翻转（R ↔ L）', sub: '0°(8) + 70.5°(24) + 109.5°(24) + 180°(8)', count: 64, color: '#6d28d9', badge: '64 条 → 4 次',
+            explain: '跨层翻转整个涡旋手性（由反演 i 等非真旋转连接）。在 80–150 nm 势垒比限速类高 3–44 倍，短边图自然滤除，全对图也只需多算 4 条。' }
+        ]
+      }
+    };
+
+    let currentMode = 'cube8';
+    let selectedClass = 0;
+
+    function renderQuotient() {
+      const m = modes[currentMode];
+      const svg = document.getElementById('quotientSvg');
+      document.getElementById('svgCaption').textContent = m.caption;
+
+      let html = '';
+      if (currentMode === 'cube8') {
+        cubeAllEdges.forEach(e => {
+          const v1 = cubeVertices[e.a], v2 = cubeVertices[e.b];
+          const isSel = e.cls === selectedClass;
+          const col = m.classes[e.cls].color;
+          const op = isSel ? 0.92 : 0.14;
+          const sw = isSel ? 2.6 : 1.1;
+          const dash = (e.cls === 2) ? 'stroke-dasharray="6 4"' : '';
+          html += `<line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="${isSel ? col : '#64748b'}" stroke-width="${sw}" stroke-opacity="${op}" ${dash} />`;
+        });
+        const rep = cubeAllEdges.find(e => e.cls === selectedClass && (e.a === 5 || e.b === 5));
+        if (rep) {
+          const v1 = cubeVertices[rep.a], v2 = cubeVertices[rep.b];
+          html += `<line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="${m.classes[selectedClass].color}" stroke-width="4.5" stroke-linecap="round" />`;
+        }
+        cubeVertices.forEach(v => {
+          const isSeed = v.id === 5;
+          html += `<circle cx="${v.x}" cy="${v.y}" r="${isSeed ? 9 : 6.5}" fill="${isSeed ? '#dbeafe' : '#ffffff'}" stroke="${isSeed ? '#2563eb' : '#475569'}" stroke-width="${isSeed ? 2.5 : 1.6}" />`;
+        });
+        html += `<text x="330" y="56" font-size="13" font-weight="600" fill="#1d4ed8">种子态 m₀</text>`;
+        html += `<text x="215" y="298" text-anchor="middle" font-size="13" fill="#475569">高亮：${m.classes[selectedClass].count} 条对称等价边（粗线为唯一需要算的 1 条代表）</text>`;
+      } else {
+        const rNodes = [], lNodes = [];
+        for (let k = 0; k < 8; k++) {
+          const ang = -Math.PI/2 + k * Math.PI / 4;
+          rNodes.push({ x: 122 + 78 * Math.cos(ang), y: 155 + 78 * Math.sin(ang) });
+          lNodes.push({ x: 338 + 78 * Math.cos(ang), y: 155 + 78 * Math.sin(ang) });
+        }
+        html += `<text x="122" y="34" text-anchor="middle" font-size="13.5" font-weight="600" fill="#1e293b">右手性层 R（8 态）</text>`;
+        html += `<text x="338" y="34" text-anchor="middle" font-size="13.5" font-weight="600" fill="#1e293b">左手性层 L（8 态）</text>`;
+
+        const drawRingClass = (nodes, step, color, active, dash='') => {
+          for (let i = 0; i < 8; i++) {
+            const j = (i + step) % 8;
+            if (step === 4 && i >= 4) continue;
+            html += `<line x1="${nodes[i].x}" y1="${nodes[i].y}" x2="${nodes[j].x}" y2="${nodes[j].y}" stroke="${active ? color : '#94a3b8'}" stroke-width="${active ? 2.2 : 0.8}" stroke-opacity="${active ? 0.88 : 0.16}" ${dash} />`;
+          }
+        };
+
+        drawRingClass(rNodes, 1, '#2563eb', selectedClass === 0);
+        drawRingClass(lNodes, 1, '#2563eb', selectedClass === 0);
+        drawRingClass(rNodes, 2, '#0f8a5f', selectedClass === 1);
+        drawRingClass(lNodes, 2, '#0f8a5f', selectedClass === 1);
+        drawRingClass(rNodes, 4, '#c26d00', selectedClass === 2, 'stroke-dasharray="5 4"');
+        drawRingClass(lNodes, 4, '#c26d00', selectedClass === 2, 'stroke-dasharray="5 4"');
+
+        for (let i = 0; i < 8; i++) {
+          const active = selectedClass === 3;
+          html += `<line x1="${rNodes[i].x}" y1="${rNodes[i].y}" x2="${lNodes[i].x}" y2="${lNodes[i].y}" stroke="${active ? '#6d28d9' : '#94a3b8'}" stroke-width="${active ? 2.2 : 0.7}" stroke-opacity="${active ? 0.75 : 0.1}" />`;
+          if (active) {
+            const j = (i + 1) % 8;
+            html += `<line x1="${rNodes[i].x}" y1="${rNodes[i].y}" x2="${lNodes[j].x}" y2="${lNodes[j].y}" stroke="#6d28d9" stroke-width="1.2" stroke-opacity="0.32" />`;
+          }
+        }
+
+        rNodes.forEach((n, idx) => {
+          const isSeed = idx === 0;
+          html += `<circle cx="${n.x}" cy="${n.y}" r="${isSeed ? 8.5 : 6}" fill="${isSeed ? '#dbeafe' : '#ffffff'}" stroke="${isSeed ? '#2563eb' : '#475569'}" stroke-width="${isSeed ? 2.4 : 1.5}" />`;
+        });
+        lNodes.forEach(n => {
+          html += `<circle cx="${n.x}" cy="${n.y}" r="6" fill="#f3e8ff" stroke="#6d28d9" stroke-width="1.5" />`;
+        });
+        html += `<text x="122" y="62" text-anchor="middle" font-size="12" font-weight="600" fill="#1d4ed8">m₀</text>`;
+        html += `<text x="230" y="294" text-anchor="middle" font-size="13" fill="#475569">高亮：${m.classes[selectedClass].count} 条边（属于当前边类）</text>`;
+      }
+      svg.innerHTML = html;
+
+      const list = document.getElementById('classList');
+      list.innerHTML = m.classes.map((c, idx) => `
+        <div class="class-item ${idx === selectedClass ? 'active' : ''}" data-idx="${idx}">
+          <div class="class-left">
+            <span class="dot" style="background:${c.color};"></span>
+            <div>
+              <div class="class-title">${c.title}</div>
+              <div class="class-sub">${c.sub}</div>
+            </div>
+          </div>
+          <span class="badge badge-blue" style="background:${c.color}18;color:${c.color};">${c.badge}</span>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('.class-item').forEach(el => {
+        el.addEventListener('click', () => {
+          selectedClass = Number(el.dataset.idx);
+          renderQuotient();
+        });
+      });
+
+      document.getElementById('classExplain').innerHTML = `<strong>为什么能约化？</strong> ${m.classes[selectedClass].explain}`;
+    }
+
+    document.querySelectorAll('#modeBtns .btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#modeBtns .btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+        selectedClass = 0;
+        renderQuotient();
+      });
+    });
+
+    let pathMode = 'compare';
+    function renderMinimax() {
+      const svg = document.getElementById('minimaxSvg');
+      const showSingle = pathMode === 'compare' || pathMode === 'single';
+      const showMini = pathMode === 'compare' || pathMode === 'minimax';
+
+      const yOf = e => 220 - e * 0.92;
+      const yThresh = yOf(58.7);
+      const ySingle = yOf(178.6);
+      const yMini = yOf(47.4);
+
+      svg.innerHTML = `
+        <line x1="70" y1="220" x2="810" y2="220" stroke="#94a3b8" stroke-width="1.5" />
+        <line x1="70" y1="26" x2="70" y2="220" stroke="#94a3b8" stroke-width="1.5" />
+        <text x="58" y="224" text-anchor="end" font-size="12" fill="#64748b">0</text>
+        <text x="58" y="${yOf(100)+4}" text-anchor="end" font-size="12" fill="#64748b">100</text>
+        <text x="58" y="${yOf(180)+4}" text-anchor="end" font-size="12" fill="#64748b">180</text>
+        <text x="20" y="126" transform="rotate(-90 20 126)" text-anchor="middle" font-size="12.5" fill="#475569">能量 E (k_BT₃₀₀)</text>
+
+        <line x1="70" y1="${yThresh}" x2="810" y2="${yThresh}" stroke="#64748b" stroke-width="1.3" stroke-dasharray="6 5" />
+        <text x="804" y="${yThresh - 7}" text-anchor="end" font-size="12" fill="#475569">10 亿年稳定阈值 ≈ 58.7 k_BT₃₀₀</text>
+
+        ${showSingle ? `
+          <path d="M 100 220 C 230 220, 310 ${ySingle}, 440 ${ySingle} C 570 ${ySingle}, 650 220, 780 220"
+                fill="none" stroke="#dc2626" stroke-width="3.2" stroke-dasharray="8 5" />
+          <circle cx="440" cy="${ySingle}" r="5.5" fill="#dc2626" />
+          <rect x="330" y="${ySingle - 34}" width="220" height="24" rx="12" fill="#fee2e2" />
+          <text x="440" y="${ySingle - 18}" text-anchor="middle" font-size="12.5" font-weight="600" fill="#b91c1c">传统单带峰值：178.6（误判稳定）</text>
+        ` : ''}
+
+        ${showMini ? `
+          <path d="M 100 220 Q 213 ${yMini - 22} 326 220 Q 440 ${yMini - 22} 554 220 Q 667 ${yMini - 22} 780 220"
+                fill="none" stroke="#0f8a5f" stroke-width="3.5" />
+          <circle cx="213" cy="${yMini}" r="5" fill="#0f8a5f" />
+          <circle cx="440" cy="${yMini}" r="5" fill="#0f8a5f" />
+          <circle cx="667" cy="${yMini}" r="5" fill="#0f8a5f" />
+          <circle cx="326" cy="220" r="6" fill="#d1fae5" stroke="#0f8a5f" stroke-width="2" />
+          <circle cx="554" cy="220" r="6" fill="#d1fae5" stroke="#0f8a5f" stroke-width="2" />
+          <text x="326" y="246" text-anchor="middle" font-size="12" fill="#0f8a5f">中间态 1 (70.5°)</text>
+          <text x="554" y="246" text-anchor="middle" font-size="12" fill="#0f8a5f">中间态 2 (109.5°)</text>
+          <rect x="576" y="${yMini - 38}" width="194" height="24" rx="12" fill="#d1fae5" />
+          <text x="673" y="${yMini - 22}" text-anchor="middle" font-size="12.5" font-weight="600" fill="#047857">Minimax 峰值：47.4（不稳定）</text>
+        ` : ''}
+
+        <circle cx="100" cy="220" r="7" fill="#2563eb" />
+        <circle cx="780" cy="220" r="7" fill="#2563eb" />
+        <text x="100" y="246" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">初态 m₀</text>
+        <text x="780" y="246" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">反平行态 −m₀</text>
+      `;
+    }
+
+    document.querySelectorAll('#pathBtns .btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#pathBtns .btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        pathMode = btn.dataset.path;
+        renderMinimax();
+      });
+    });
+
+    let grpMode = 'orbit';
+    function renderDist() {
+      const svg = document.getElementById('distSvg');
+      const callout = document.getElementById('distCallout');
+      const merged = grpMode === 'dist';
+
+      svg.innerHTML = `
+        <line x1="70" y1="128" x2="790" y2="128" stroke="#94a3b8" stroke-width="1.5" />
+        <text x="70" y="152" font-size="12" fill="#64748b">70°</text>
+        <text x="410" y="152" text-anchor="middle" font-size="12" fill="#64748b">90°</text>
+        <text x="520" y="152" text-anchor="middle" font-size="12" fill="#64748b">100°</text>
+        <text x="790" y="152" text-anchor="end" font-size="12" fill="#64748b">180°（磁化 rms 角度距离）</text>
+
+        ${merged ? `
+          <rect x="418" y="34" width="144" height="106" rx="16" fill="#fee2e2" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4" />
+          <text x="490" y="24" text-anchor="middle" font-size="13" font-weight="700" fill="#b91c1c">按距离误合并为同一类！</text>
+        ` : `
+          <rect x="386" y="42" width="102" height="96" rx="14" fill="#d1fae5" stroke="#0f8a5f" stroke-width="1.8" />
+          <rect x="502" y="42" width="108" height="96" rx="14" fill="#ede9fe" stroke="#6d28d9" stroke-width="1.8" />
+          <text x="437" y="32" text-anchor="middle" font-size="12.5" font-weight="600" fill="#047857">同手性轨道</text>
+          <text x="556" y="32" text-anchor="middle" font-size="12.5" font-weight="600" fill="#6d28d9">异手性轨道</text>
+        `}
+
+        <circle cx="${merged ? 452 : 437}" cy="128" r="8" fill="#0f8a5f" />
+        <text x="${merged ? 452 : 437}" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="#047857">93.0°</text>
+        <text x="${merged ? 452 : 437}" y="98" text-anchor="middle" font-size="12.5" fill="#047857">ΔE = 195.8</text>
+
+        <circle cx="${merged ? 528 : 556}" cy="128" r="8" fill="#6d28d9" />
+        <text x="${merged ? 528 : 556}" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="#6d28d9">97.4°</text>
+        <text x="${merged ? 528 : 556}" y="98" text-anchor="middle" font-size="12.5" fill="#6d28d9">ΔE = 1470.7</text>
+
+        <rect x="640" y="54" width="185" height="60" rx="12" fill="${merged ? '#fee2e2' : '#eff6ff'}" />
+        <text x="732" y="78" text-anchor="middle" font-size="12.5" fill="#475569">最终返回反转势垒</text>
+        <text x="732" y="102" text-anchor="middle" font-size="18" font-weight="700" fill="${merged ? '#dc2626' : '#2563eb'}">${merged ? '1470.7（错高 7.5×）' : '195.8 k_BT₃₀₀'}</text>
+      `;
+
+      if (merged) {
+        callout.className = 'callout warn';
+        callout.innerHTML = '<strong>错误分组的代价：</strong>93.0°（同手性）与 97.4°（异手性）距离挨得很近，一旦按距离合并，选错代表路径就会把势垒高估 <strong>7.5 倍</strong>——比不约化更危险。';
+      } else {
+        callout.className = 'callout good';
+        callout.innerHTML = '<strong>群轨道的严格性：</strong>无论两条边在距离上多接近，只要不存在群元素能把它们互相映射，商图就严格分开计算，保证绝不张冠李戴。';
+      }
+    }
+
+    document.querySelectorAll('#groupBtns .btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#groupBtns .btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        grpMode = btn.dataset.grp;
+        renderDist();
+      });
+    });
+
+    document.querySelectorAll('#loopSteps .step-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('#loopSteps .step-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+      });
+    });
+
+    const presets = {
+      oh_short: { full: 120, quot: 3,  book: '4.34 秒', note: '150 nm 截角八面体 ⟨111⟩ 涡旋（短边图 K=4）：从 120 条直降到 3 条，覆盖全部限速跃迁。' },
+      oh_all:   { full: 120, quot: 7,  book: '4.34 秒', note: '150 nm 截角八面体 ⟨111⟩ 涡旋（全对商图）：7 条代表路径即可覆盖全部 120 对（含 4 类手性翻转）。' },
+      d4h:      { full: 120, quot: 5,  book: '2.23 秒', note: '120×120×200 nm 方棱柱（D_4h）：16 态 120 条边压缩为 5 个短边类，提速 24 倍。' },
+      ci:       { full: 6,   quot: 3,  book: '0.42 秒', note: '晶轴旋转后的截角八面体：仅剩空间反演 i 与时间反演 T（|𝒢|=4），依然自动完成精确约化。' },
+      natural:  { full: 15,  quot: 7,  book: '< 1 秒',  note: '维苏威天然颗粒（V116，3 族 6 态）：无点群对称，靠时间反演约化 2 倍，再由 Algorithm 2 自动补全漏掉的新态。' }
+    };
+
+    function fmtTime(mins) {
+      if (mins < 60) return `${mins.toFixed(0)} 分钟`;
+      return `${(mins / 60).toFixed(1)} 小时`;
+    }
+
+    function updateCalc() {
+      const p = presets[document.getElementById('grainSelect').value];
+      const perPath = Number(document.getElementById('timeSlider').value);
+      document.getElementById('timeVal').textContent = `${perPath} 分钟`;
+
+      const fullMins = p.full * perPath;
+      const quotMins = p.quot * perPath;
+      const ratio = p.full / p.quot;
+
+      document.getElementById('fullLabel').textContent = `${p.full} 条 · ${fmtTime(fullMins)}`;
+      document.getElementById('quotLabel').textContent = `${p.quot} 条 · ${fmtTime(quotMins)}`;
+      document.getElementById('quotBar').style.width = `${Math.max(4, (p.quot / p.full) * 100)}%`;
+      document.getElementById('bookTime').textContent = p.book;
+      document.getElementById('speedupBadge').textContent = `${ratio.toFixed(1)}×`;
+      document.getElementById('calcSummary').innerHTML = `<strong>实测效果：</strong>${p.note} 预计节省 <strong>${fmtTime(fullMins - quotMins)}</strong> 算力。`;
+    }
+
+    document.getElementById('grainSelect').addEventListener('change', updateCalc);
+    document.getElementById('timeSlider').addEventListener('input', updateCalc);
+
+    renderQuotient();
+    renderMinimax();
+    renderDist();
+    updateCalc();
+  </script>
+</body>
+</html>
